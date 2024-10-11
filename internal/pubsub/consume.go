@@ -1,9 +1,6 @@
 package pubsub
 
 import (
-	"bytes"
-	"encoding/gob"
-	"encoding/json"
 	"fmt"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -113,19 +110,6 @@ func SubscribeJSON[T any](
 	}()
 
 	return nil
-}
-
-func gobDecoder[T any](data []byte) (T, error) {
-	var target T
-	decoder := gob.NewDecoder(bytes.NewBuffer(data))
-	err := decoder.Decode(&target)
-	return target, err
-}
-
-func jsonDecoder[T any](data []byte) (T, error) {
-	var target T
-	err := json.Unmarshal(data, &target)
-	return target, err
 }
 
 func SubscribeGOB[T any](
