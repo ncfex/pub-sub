@@ -126,6 +126,12 @@ func SubscribeGOB[T any](
 		return err
 	}
 
+	// qos
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return err
+	}
+
 	rabbitCh, err := ch.Consume(
 		q.Name,
 		"",
