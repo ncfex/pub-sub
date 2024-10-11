@@ -67,7 +67,7 @@ func main() {
 		case "spawn":
 			err := gameState.CommandSpawn(cmds)
 			if err != nil {
-				break
+				continue
 			}
 		case "move":
 			armyMove, err := gameState.CommandMove(cmds)
@@ -78,14 +78,14 @@ func main() {
 			err = pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilTopic,
-				routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
+				routing.ArmyMovesPrefix+"."+armyMove.Player.Username,
 				armyMove,
 			)
 			if err != nil {
 				fmt.Printf("error: %s\n", err)
 				continue
 			}
-			fmt.Printf("Move was succesful for user %s\n", gameState.GetUsername())
+			fmt.Printf("Move was succesful for user %s\n", armyMove.Player.Username)
 		case "status":
 			gameState.CommandStatus()
 		case "help":
