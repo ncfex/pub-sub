@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -10,6 +13,19 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+func gobDecoder[T any](data []byte) (T, error) {
+	var target T
+	decoder := gob.NewDecoder(bytes.NewBuffer(data))
+	err := decoder.Decode(&target)
+	return target, err
+}
+
+func jsonDecoder[T any](data []byte) (T, error) {
+	var target T
+	err := json.Unmarshal(data, &target)
+	return target, err
+}
 
 func main() {
 	fmt.Println("Starting Peril client...")
@@ -40,6 +56,7 @@ func main() {
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
 		handlerMove(gameState, publishCh),
+		jsonDecoder,
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to %s: %v", routing.ArmyMovesPrefix, err)
@@ -52,6 +69,7 @@ func main() {
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.SimpleQueueDurable,
 		handlerWar(gameState, publishCh),
+		jsonDecoder,
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to %s: %v", routing.ArmyMovesPrefix, err)
@@ -64,6 +82,7 @@ func main() {
 		routing.PauseKey,
 		pubsub.SimpleQueueTransient,
 		handlerPause(gameState),
+		jsonDecoder,
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to %s: %v", routing.PauseKey, err)

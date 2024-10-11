@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -9,6 +12,19 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+func gobDecoder[T any](data []byte) (T, error) {
+	var target T
+	decoder := gob.NewDecoder(bytes.NewBuffer(data))
+	err := decoder.Decode(&target)
+	return target, err
+}
+
+func jsonDecoder[T any](data []byte) (T, error) {
+	var target T
+	err := json.Unmarshal(data, &target)
+	return target, err
+}
 
 func main() {
 	const rabbitConnString = "amqp://guest:guest@localhost:5672/"
@@ -25,15 +41,17 @@ func main() {
 		log.Fatalf("could not create channel: %v", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGOB(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.SimpleQueueDurable,
+		handlerLog(),
+		gobDecoder,
 	)
 	if err != nil {
-		log.Fatalf("could not create channel: %v", err)
+		log.Fatalf("could not starting consuming logs: %v", err)
 	}
 
 	gamelogic.PrintServerHelp()

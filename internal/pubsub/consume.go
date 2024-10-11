@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -68,6 +70,7 @@ func SubscribeJSON[T any](
 	key string,
 	simpleQueueType SimpleQueueType,
 	handler func(T) Acktype,
+	unmarshaller func([]byte) (T, error),
 ) error {
 	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
@@ -87,10 +90,69 @@ func SubscribeJSON[T any](
 		return err
 	}
 
-	unmarshaller := func(data []byte) (T, error) {
-		var target T
-		err := json.Unmarshal(data, &target)
-		return target, err
+	go func() {
+		defer ch.Close()
+		for msg := range rabbitCh {
+			target, err := unmarshaller(msg.Body)
+			if err != nil {
+				fmt.Printf("could not unmarshal message: %v\n", err)
+				continue
+			}
+			switch handler(target) {
+			case Ack:
+				msg.Ack(false)
+				fmt.Println("Ack")
+			case NackDiscard:
+				msg.Nack(false, false)
+				fmt.Println("NackDiscard")
+			case NackRequeue:
+				msg.Nack(false, true)
+				fmt.Println("NackRequeue")
+			}
+		}
+	}()
+
+	return nil
+}
+
+func gobDecoder[T any](data []byte) (T, error) {
+	var target T
+	decoder := gob.NewDecoder(bytes.NewBuffer(data))
+	err := decoder.Decode(&target)
+	return target, err
+}
+
+func jsonDecoder[T any](data []byte) (T, error) {
+	var target T
+	err := json.Unmarshal(data, &target)
+	return target, err
+}
+
+func SubscribeGOB[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType SimpleQueueType,
+	handler func(T) Acktype,
+	unmarshaller func([]byte) (T, error),
+) error {
+	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
+	if err != nil {
+		return err
+	}
+
+	rabbitCh, err := ch.Consume(
+		q.Name,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
 	}
 
 	go func() {
